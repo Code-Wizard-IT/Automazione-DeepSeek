@@ -1,0 +1,20 @@
+# Generated scripts (build locally with build_script_v2.py)
+figma-deepseek-automation-v2.user.js
+figma-deepseek-automation-v1.user.js
+
+# Output files
+output*/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temp
+*.tmp
+*.bak
+make_template.py
