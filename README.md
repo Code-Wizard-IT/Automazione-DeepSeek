@@ -1,97 +1,122 @@
-# 🤖 Automazione DeepSeek
+# 🎨 Automazione DeepSeek — Figma Graphic Design Catalogs
 
-Tampermonkey userscript per automazione multi-prompt su [DeepSeek Chat](https://chat.deepseek.com/).
+Automazione completa per generare cataloghi di Graphic Design su DeepSeek Chat, con esportazione diretta su disco.
 
-Invia automaticamente una sequenza di prompt a DeepSeek, rileva il completamento delle risposte con il sistema **Triple-Lock**, ed esporta ogni output come file `.txt` organizzati in cartelle sul disco locale.
+## Versione corrente: v2.1
 
-## ✨ Funzionalità
+### Novità v2.1 (rispetto a v2.0)
+- **Anti-detection**: jitter randomizzato sul typing delay (30-90ms), pause inter-prompt randomizzate (10-30s)
+- **Pause periodiche**: break automatico di 3-5 minuti ogni 8 prompt (simulazione comportamento umano)
+- **Error recovery**: rilevamento automatico "Server is busy" e "Too many messages" con retry + backoff
+- **Selector aggiornato**: compatibile con le nuove classi CSS di DeepSeek (`.ds-markdown`)
 
-- **Multi-prompt sequenziale**: invia N prompt in sequenza, ognuno in una nuova chat
-- **Triple-Lock detection**: conferma il completamento della risposta con 3 condizioni simultanee verificate 5 volte
-- **Export su disco**: salvataggio diretto tramite File System Access API (no download manuali)
-- **Parti separate**: se la risposta viene troncata, esporta parti incrementali (`parte-1.txt`, `parte-2.txt`, ...)
-- **Continue automatico**: rileva il tasto "Continue generating" e lo clicca automaticamente
-- **Stale detection**: se la risposta si blocca, invia "Continua" come testo
-- **Auto-resume**: riprende da dove si era interrotto dopo un refresh della pagina
-- **UI integrata**: pannello di controllo draggable con stato, progresso e log
+### Archivio
+La versione precedente (v2.0) è disponibile nella cartella [`old/`](old/).
 
-## 📁 Struttura Repository
+---
+
+## Struttura del progetto
 
 ```
-├── deepseek-automation-template.user.js   # Script template (senza prompt)
-├── build_script_v2.py                     # Build script Python — assembla template + prompt
-├── prompts/                               # Prompt sorgente in Markdown
+├── build_script_v2.1.py              # Build script (assembla template + prompt)
+├── prompts/                           # 15 file markdown con i prompt
 │   ├── PROMPT-FIGMA-01-FUNDAMENTALS.md
 │   ├── PROMPT-FIGMA-02-TYPOGRAPHY.md
-│   └── ...
-└── README.md
+│   └── ... (12 principali + 3 master/knowledge)
+├── old/                               # Versione precedente (v2.0)
+│   ├── build_script_v2.py
+│   ├── deepseek-automation-template.user.js
+│   └── README.md
+├── README.md                          # Questo file
+└── .gitignore
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Usa il template direttamente
+### Metodo 1: Build Script (consigliato)
 
-1. Installa [Tampermonkey](https://www.tampermonkey.net/)
-2. Copia il contenuto di `deepseek-automation-template.user.js`
-3. Aggiungi i tuoi prompt nell'array `PROMPTS` seguendo il formato documentato nel file
-4. Vai su https://chat.deepseek.com/ e clicca **Start All**
+1. Clona il repo
+2. Posiziona i file prompt nella cartella `prompts/`
+3. Modifica i percorsi nel build script se necessario
+4. Esegui: `python build_script_v2.1.py`
+5. Lo script genera `figma-deepseek-automation-v2.1.user.js`
+6. Installa come UserScript (Tampermonkey) oppure inietta direttamente nella console
 
-### 2. Usa il build script (consigliato per molti prompt)
+### Metodo 2: Iniezione diretta (Proposal A)
 
-1. Metti i tuoi prompt come file `.md` nella cartella `prompts/`
-2. Modifica `build_script_v2.py` per puntare alla tua cartella prompt
-3. Esegui: `python build_script_v2.py`
-4. Installa il file `.user.js` generato in Tampermonkey
+1. Apri `chat.deepseek.com` nel browser
+2. Apri la console sviluppatore (F12)
+3. Incolla il contenuto dello script generato
+4. Il pannello UI appare in basso a sinistra
+5. Seleziona la cartella di output cliccando l'indicatore 📁
+6. Clicca "▶ Start All"
 
-## 📝 Formato Prompt
+---
 
-Ogni prompt deve terminare con un marker di completamento:
-
-```
-Il tuo prompt qui...
-
-Alla fine, scrivi esattamente questo marker:
-===PROMPT_N_COMPLETATO===
-```
-
-Dove `N` è l'ID sequenziale del prompt (1, 2, 3, ...).
-
-## ⚙️ Configurazione
-
-Parametri principali in `CONFIG`:
+## Configurazione
 
 | Parametro | Default | Descrizione |
 |---|---|---|
-| `TYPING_DELAY` | 50ms | Ritardo tra caratteri durante la digitazione |
-| `POLL_INTERVAL` | 3000ms | Intervallo di polling per controllare la risposta |
-| `MAX_POLL_CYCLES` | 200 | Cicli massimi prima del timeout |
-| `STALE_THRESHOLD` | 5 | Cicli senza cambiamenti prima di inviare "Continua" |
-| `TRIPLE_LOCK_REQUIRED` | 5 | Check consecutivi necessari per confermare il completamento |
-| `CONTINUE_MAX_RETRIES` | 15 | Tentativi massimi di "Continue" |
-| `MIN_PART_SIZE` | 100 | Caratteri minimi per salvare una parte |
+| `TYPING_DELAY_MIN/MAX` | 30-90ms | Range jitter digitazione |
+| `INTER_PROMPT_PAUSE_MIN/MAX` | 10-30s | Pausa randomizzata tra prompt |
+| `LONG_BREAK_EVERY` | 8 | Break lungo ogni N prompt |
+| `LONG_BREAK_MIN/MAX` | 3-5 min | Durata break lungo |
+| `POLL_INTERVAL` | 3000ms | Intervallo polling risposta |
+| `MAX_POLL_CYCLES` | 200 | Cicli max di polling |
+| `STALE_THRESHOLD` | 5 | Cicli stallo prima di "Continua" |
+| `TRIPLE_LOCK_REQUIRED` | 5 | Conferme consecutive per completamento |
+| `RATE_LIMIT_WAIT` | 60s | Attesa su rate limit |
+| `SERVER_BUSY_WAIT` | 30s | Attesa su server busy |
+| `ERROR_MAX_RETRIES` | 10 | Max tentativi per errore |
 
-## 📂 Output
+## Formato prompt
 
-L'output viene salvato nella cartella selezionata con questa struttura:
+Ogni prompt **deve** contenere nella risposta attesa il marker di completamento:
 
 ```
-output/
-├── 01-PROMPT-NAME/
-│   ├── PROMPT-NAME-parte-1.txt
-│   └── PROMPT-NAME-parte-2.txt
-├── 02-ANOTHER-PROMPT/
-│   └── ANOTHER-PROMPT-parte-1.txt
+===PROMPT_{N}_COMPLETATO===
+```
+
+Il sistema Triple-Lock verifica:
+1. ✅ Marker presente nel testo
+2. ✅ Marker nelle ultime 500 caratteri
+3. ✅ Generazione terminata (nessun pulsante "Stop" visibile)
+
+Solo dopo 5 conferme consecutive il prompt è considerato completato.
+
+## Output
+
+I file vengono salvati nella struttura:
+```
+output-folder/
+├── 01-FIGMA-01-FUNDAMENTALS/
+│   ├── FIGMA-01-FUNDAMENTALS-parte-1.txt
+│   └── FIGMA-01-FUNDAMENTALS-parte-2.txt  (se continua)
+├── 02-FIGMA-02-TYPOGRAPHY/
+│   └── FIGMA-02-TYPOGRAPHY-parte-1.txt
 └── ...
 ```
 
-## 🔒 Triple-Lock System
+## Anti-Detection
 
-Il sistema Triple-Lock conferma il completamento verificando **3 condizioni simultaneamente, 5 volte consecutive** (con 2 secondi tra ogni check):
+Lo script simula un comportamento umano naturale:
+- **Jitter typing**: ogni messaggio ha un delay randomizzato (30-90ms)
+- **Pause inter-prompt**: 10-30 secondi casuali tra un prompt e l'altro
+- **Break periodici**: 3-5 minuti di pausa ogni 8 prompt completati
+- **Error recovery**: se DeepSeek risponde "too frequently" o "server busy", lo script attende e riprova automaticamente
 
-1. **Marker trovato** nel testo della risposta
-2. **Marker negli ultimi 500 caratteri** (è davvero alla fine)
-3. **Generazione fermata** (nessun bottone "Stop" attivo)
+## Console API
 
-## 📄 Licenza
+```javascript
+FIGMA_AUTO.start(1)     // Avvia dal prompt 1
+FIGMA_AUTO.start(5)     // Avvia dal prompt 5
+FIGMA_AUTO.stop()       // Ferma l'esecuzione
+FIGMA_AUTO.status()     // Stato corrente
+FIGMA_AUTO.zip()        // Esporta ZIP di tutti i cached
+FIGMA_AUTO.selectFolder() // Seleziona cartella output
+FIGMA_AUTO.clearCache() // Pulisci cache localStorage
+```
+
+## Licenza
 
 MIT
