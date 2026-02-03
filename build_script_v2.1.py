@@ -51,7 +51,7 @@ script_parts.append("""// ==UserScript==
 // @name         Figma DeepSeek Automation v2.1
 // @namespace    http://tampermonkey.net/
 // @version      2.1
-// @description  Automazione 12 prompt Figma su DeepSeek — Triple-Lock + anti-detection + salvataggio diretto
+// @description  Automazione 12 prompt Figma su DeepSeek — Triple-Lock + anti-detection + nav-verify + salvataggio diretto
 // @author       AutoGen
 // @match        https://chat.deepseek.com/*
 // @grant        none
@@ -515,12 +515,38 @@ print("Parts 6-8 done")
 # ═══════════════════════════════════════════
 script_parts.append("""
   // ═══════════════════════════════════════════
-  // §9. NEW CHAT NAVIGATION
+  // §9. NEW CHAT NAVIGATION (with verification)
   // ═══════════════════════════════════════════
+
+  // Helper: detect if current page is an empty/new chat
+  function isNewChat() {
+    // Check 1: no AI response containers in the page
+    const responses = document.querySelectorAll('.ds-markdown');
+    if (responses.length > 0) return false;
+    // Check 2: no user message bubbles
+    const allDivs = document.querySelectorAll('div');
+    for (const d of allDivs) {
+      const cl = d.className || '';
+      if (cl.includes('fIxvnm') || cl.includes('userMessage') || cl.includes('user-message') || cl.includes('human-message')) {
+        return false;
+      }
+    }
+    // Check 3: textarea should be empty (or have placeholder)
+    const textarea = document.querySelector('textarea');
+    if (textarea && textarea.value && textarea.value.trim().length > 0) return false;
+    return true;
+  }
+
   async function navigateToNewChat() {
     log('\\u{1F195} Navigating to new chat...');
 
-    // Strategy 1: "+" icon button in top-left area (rightmost ds-icon-button = new chat)
+    // Quick check: already in a new chat?
+    if (isNewChat()) {
+      log('  Already in a new chat, skipping navigation');
+      return true;
+    }
+
+    // Strategy 1: Click "+" icon button in top-left area
     try {
       const iconBtns = Array.from(document.querySelectorAll('div.ds-icon-button, button.ds-icon-button'));
       const topBtns = iconBtns.filter(function(btn) {
@@ -528,37 +554,63 @@ script_parts.append("""
         return rect.top < 80 && rect.left < 300 && btn.querySelector('svg');
       });
       if (topBtns.length >= 2) {
-        // Sort by x position — rightmost is the "+" new chat button
         topBtns.sort(function(a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
         const btn = topBtns[topBtns.length - 1];
-        log('  Strategy 1: Found "+" new chat button (rightmost of ' + topBtns.length + ' icons)');
+        log('  Strategy 1: Clicking "+" button (rightmost of ' + topBtns.length + ' icons)');
         btn.click();
-        await sleep(2000);
-        return true;
+        await sleep(3000);
+        if (isNewChat()) {
+          log('  Strategy 1: \\u{2705} Verified — new chat opened');
+          return true;
+        }
+        log('  Strategy 1: \\u{274C} Click did not navigate, trying next...');
       }
-    } catch(e) {}
+    } catch(e) {
+      log('  Strategy 1: Error — ' + e.message);
+    }
 
-    // Strategy 2: "new chat" text link/button
+    // Strategy 2: Click <a href="/"> or elements with "new chat" text
     try {
       const clickables = document.querySelectorAll('a, button, div[role="button"], span[role="button"]');
       for (const el of clickables) {
-        const txt = (el.textContent || '').toLowerCase();
+        const txt = (el.textContent || '').toLowerCase().trim();
         const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-        const href = (el.getAttribute('href') || '').toLowerCase();
+        const href = (el.getAttribute('href') || '');
         if (
           txt.includes('new chat') || txt.includes('nuova chat') ||
           aria.includes('new chat') || href === '/'
         ) {
-          log('  Strategy 2: Found text/link button');
+          log('  Strategy 2: Clicking element — text="' + txt.substring(0, 30) + '" href="' + href + '"');
           el.click();
-          await sleep(2000);
-          return true;
+          await sleep(3000);
+          if (isNewChat()) {
+            log('  Strategy 2: \\u{2705} Verified — new chat opened');
+            return true;
+          }
+          log('  Strategy 2: \\u{274C} Click did not navigate, trying more...');
         }
       }
-    } catch(e) {}
+    } catch(e) {
+      log('  Strategy 2: Error — ' + e.message);
+    }
 
-    // Strategy 3: URL navigation (full reload)
-    log('  Strategy 3: URL navigation (reload)');
+    // Strategy 3: SPA-style pushState navigation
+    try {
+      log('  Strategy 3: SPA pushState to /');
+      window.history.pushState({}, '', '/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      await sleep(3000);
+      if (isNewChat()) {
+        log('  Strategy 3: \\u{2705} Verified — new chat opened via pushState');
+        return true;
+      }
+      log('  Strategy 3: \\u{274C} pushState did not reset chat');
+    } catch(e) {
+      log('  Strategy 3: Error — ' + e.message);
+    }
+
+    // Strategy 4: Hard reload to root (guaranteed, loses injected state for non-Tampermonkey)
+    log('  Strategy 4: \\u{1F6A8} Hard reload to ' + CONFIG.NEW_CHAT_URL);
     saveState();
     window.location.replace(CONFIG.NEW_CHAT_URL + '?_t=' + Date.now());
     return true;
