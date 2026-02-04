@@ -1,30 +1,63 @@
+#!/usr/bin/env python3
+"""
+build_template.py - Assembles automation .user.js from config + prompt files.
+Reusable template: edit config.py, add your prompts, run this script.
+
+Usage:
+  1. Edit config.py (paths, naming, prompt count)
+  2. Place .md prompt files in PROMPT_DIR
+  3. python build_template.py
+"""
 import os
+import sys
 
-prompt_dir = r"C:\Users\cresc\Desktop\Prompt"
-output_file = r"C:\Users\cresc\Desktop\figma-deepseek-automation-v2.1.user.js"
+# Import config from same directory
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import (
+    PROMPT_DIR, OUTPUT_SCRIPT, PROMPT_FILE_PREFIX, PROMPT_FILE_SUFFIX,
+    DISPLAY_PREFIX, PROMPT_COUNT, SCRIPT_NAME, SCRIPT_VERSION,
+    SCRIPT_DESCRIPTION, DEEPSEEK_URL,
+    TYPING_DELAY_MIN, TYPING_DELAY_MAX,
+    INTER_PROMPT_PAUSE_MIN, INTER_PROMPT_PAUSE_MAX,
+    LONG_BREAK_EVERY, LONG_BREAK_MIN, LONG_BREAK_MAX
+)
 
-# Read all 12 prompt files
+output_file = OUTPUT_SCRIPT
+
+# ═══════════════════════════════════════════
+# STEP 1: LOAD PROMPTS (configurable)
+# ═══════════════════════════════════════════
 prompts = []
-for i in range(1, 13):
-    fname_prefix = f"PROMPT-FIGMA-{i:02d}-"
-    for f in os.listdir(prompt_dir):
-        if f.startswith(fname_prefix) and f.endswith('.md'):
-            fpath = os.path.join(prompt_dir, f)
+for i in range(1, PROMPT_COUNT + 1):
+    fname_prefix = f"{PROMPT_FILE_PREFIX}{i:02d}-"
+    found = False
+    for f in sorted(os.listdir(PROMPT_DIR)):
+        if f.startswith(fname_prefix) and f.endswith(PROMPT_FILE_SUFFIX):
+            fpath = os.path.join(PROMPT_DIR, f)
             with open(fpath, 'r', encoding='utf-8') as fp:
                 content = fp.read()
-            short_name = f.replace('PROMPT-FIGMA-', '').replace('.md', '')
+            base = PROMPT_FILE_PREFIX.rstrip('-') + '-'
+            short_name = f.replace(base, '').replace(PROMPT_FILE_SUFFIX, '')
             prompts.append({'id': i, 'name': short_name, 'content': content})
+            found = True
             break
+    if not found:
+        print(f"WARNING: No file for prompt {i} (expected {fname_prefix}*{PROMPT_FILE_SUFFIX})")
 
-print(f"Loaded {len(prompts)} prompts")
+print(f"Loaded {len(prompts)}/{PROMPT_COUNT} prompts from {PROMPT_DIR}")
+if not prompts:
+    print("ERROR: No prompts found. Check config.py settings.")
+    sys.exit(1)
 
+# ═══════════════════════════════════════════
+# STEP 2: ESCAPE & BUILD PROMPT JS
+# ═══════════════════════════════════════════
 def escape_js_template(text):
     text = text.replace('\\', '\\\\')
     text = text.replace('`', '\\`')
     text = text.replace('${', '\\${')
     return text
 
-# Build prompt array JS code
 prompt_array_items = []
 for p in prompts:
     marker_instruction = (
@@ -37,23 +70,26 @@ for p in prompts:
     )
     full_content = p['content'] + marker_instruction
     escaped = escape_js_template(full_content)
-    item = f"    {{\n      id: {p['id']},\n      name: \"FIGMA-{p['name']}\",\n      content: `{escaped}`\n    }}"
+    item = f"    {{\n      id: {p['id']},\n      name: \"{DISPLAY_PREFIX}{p['name']}\",\n      content: `{escaped}`\n    }}"
     prompt_array_items.append(item)
 
 prompts_js = "  const PROMPTS = [\n" + ",\n".join(prompt_array_items) + "\n  ];\n"
 
+# ═══════════════════════════════════════════
+# STEP 3: ASSEMBLE SCRIPT
+# ═══════════════════════════════════════════
 script_parts = []
 
 # ═══════════════════════════════════════════
 # PART 1: METADATA + CONFIG
 # ═══════════════════════════════════════════
-script_parts.append("""// ==UserScript==
-// @name         Figma DeepSeek Automation v2.1
+script_parts.append(f"""// ==UserScript==
+// @name         {SCRIPT_NAME} v{SCRIPT_VERSION}
 // @namespace    http://tampermonkey.net/
-// @version      2.1
-// @description  Automazione 12 prompt Figma su DeepSeek — Triple-Lock + anti-detection + nav-verify + salvataggio diretto
+// @version      {SCRIPT_VERSION}
+// @description  {SCRIPT_DESCRIPTION}
 // @author       AutoGen
-// @match        https://chat.deepseek.com/*
+// @match        https://{DEEPSEEK_URL}/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -71,7 +107,7 @@ script_parts.append("""// ==UserScript==
     STALE_THRESHOLD: 5,
     MARKER_PREFIX: '===PROMPT_',
     MARKER_SUFFIX: '_COMPLETATO===',
-    NEW_CHAT_URL: 'https://chat.deepseek.com/',
+    NEW_CHAT_URL: 'https://{DEEPSEEK_URL}/',
     TRIPLE_LOCK_INTERVAL: 2000,
     TRIPLE_LOCK_REQUIRED: 5,
     TRIPLE_LOCK_TAIL_CHARS: 500,
@@ -82,13 +118,13 @@ script_parts.append("""// ==UserScript==
     MIN_PART_SIZE: 100,             // minimum chars to save as a part
 
     // Anti-detection: Jitter & Pacing
-    TYPING_DELAY_MIN: 30,            // ms min typing delay
-    TYPING_DELAY_MAX: 90,            // ms max typing delay
-    INTER_PROMPT_PAUSE_MIN: 10000,   // 10s min between prompts
-    INTER_PROMPT_PAUSE_MAX: 30000,   // 30s max between prompts
-    LONG_BREAK_EVERY: 8,             // long break every N prompts
-    LONG_BREAK_MIN: 180000,          // 3 min min break
-    LONG_BREAK_MAX: 300000,          // 5 min max break
+    TYPING_DELAY_MIN: {TYPING_DELAY_MIN},            // ms min typing delay
+    TYPING_DELAY_MAX: {TYPING_DELAY_MAX},            // ms max typing delay
+    INTER_PROMPT_PAUSE_MIN: {INTER_PROMPT_PAUSE_MIN * 1000},   // min between prompts
+    INTER_PROMPT_PAUSE_MAX: {INTER_PROMPT_PAUSE_MAX * 1000},   // max between prompts
+    LONG_BREAK_EVERY: {LONG_BREAK_EVERY},             // long break every N prompts
+    LONG_BREAK_MIN: {LONG_BREAK_MIN * 1000},          // min break
+    LONG_BREAK_MAX: {LONG_BREAK_MAX * 1000},          // max break
 
     // Error recovery
     RATE_LIMIT_WAIT: 60000,          // 1 min wait on "too frequently"
@@ -102,7 +138,7 @@ script_parts.append("""// ==UserScript==
 # ═══════════════════════════════════════════
 script_parts.append("""
   // ═══════════════════════════════════════════
-  // §2. PROMPTS (12 Figma Graphic Design)
+  // S2. PROMPTS ({len(prompts)} loaded from config)
   // ═══════════════════════════════════════════
 """)
 script_parts.append(prompts_js)

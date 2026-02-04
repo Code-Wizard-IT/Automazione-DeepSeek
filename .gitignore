@@ -1,6 +1,5 @@
-# Generated scripts (build locally with build_script_v2.py)
-figma-deepseek-automation-v2.user.js
-figma-deepseek-automation-v1.user.js
+# Generated scripts (build locally with build_template.py)
+*.user.js
 
 # Output files
 output*/
@@ -17,4 +16,8 @@ Desktop.ini
 # Temp
 *.tmp
 *.bak
+
+# Old build scripts (use build_template.py instead)
+build_script_v2.py
+build_script_v2.1.py
 make_template.py
