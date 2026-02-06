@@ -1,4 +1,4 @@
-# Prompts Folder
+# Prompts Directory
 
 Place your prompt `.md` files here.
 
@@ -6,35 +6,33 @@ Place your prompt `.md` files here.
 
 Files must follow this pattern:
 ```
-{PREFIX}{NN}-{TOPIC}.md
+{PROMPT_FILE_PREFIX}{NN}-{TOPIC}.md
 ```
 
 Where:
-- `{PREFIX}` matches `PROMPT_FILE_PREFIX` in `config.py` (default: `PROMPT-FIGMA-`)
-- `{NN}` is the zero-padded prompt number (01, 02, 03...)
-- `{TOPIC}` is the topic name (used in output folder names)
+- `{PROMPT_FILE_PREFIX}` is defined in `config.py` (default: `PROMPT-PROJECT-`)
+- `{NN}` is a two-digit number (01, 02, 03...)
+- `{TOPIC}` is a descriptive name for the prompt
 
 ## Examples
 
+With default config:
 ```
-PROMPT-FIGMA-01-FUNDAMENTALS.md
-PROMPT-FIGMA-02-TYPOGRAPHY.md
-PROMPT-FIGMA-03-COLOR-SYSTEMS.md
-```
-
-## Custom naming
-
-To use different naming, edit `config.py`:
-
-```python
-PROMPT_FILE_PREFIX = "PROMPT-REACT-"    # your prefix
-PROMPT_COUNT = 8                         # how many prompts
-DISPLAY_PREFIX = "REACT-"               # display name prefix
+PROMPT-PROJECT-01-INTRO.md
+PROMPT-PROJECT-02-CONTENT.md
+PROMPT-PROJECT-03-CONCLUSION.md
 ```
 
-Then create files like:
+With custom prefix `PROMPT-MYAPP-`:
 ```
-PROMPT-REACT-01-BASICS.md
-PROMPT-REACT-02-HOOKS.md
-...
+PROMPT-MYAPP-01-SETUP.md
+PROMPT-MYAPP-02-FEATURES.md
+PROMPT-MYAPP-03-DEPLOYMENT.md
 ```
+
+## Configuration
+
+Update these values in `config.py`:
+- `PROMPT_DIR`: Path to this directory
+- `PROMPT_FILE_PREFIX`: Your custom prefix
+- `PROMPT_COUNT`: Total number of prompts

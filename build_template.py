@@ -83,6 +83,7 @@ script_parts = []
 # ═══════════════════════════════════════════
 # PART 1: METADATA + CONFIG
 # ═══════════════════════════════════════════
+# Split into header (with Python vars) and config (pure JS)
 script_parts.append(f"""// ==UserScript==
 // @name         {SCRIPT_NAME} v{SCRIPT_VERSION}
 // @namespace    http://tampermonkey.net/
@@ -94,13 +95,13 @@ script_parts.append(f"""// ==UserScript==
 // @run-at       document-idle
 // ==/UserScript==
 
-(function() {
+(function() {{
   'use strict';
 
   // ═══════════════════════════════════════════
   // §1. CONFIG
   // ═══════════════════════════════════════════
-  const CONFIG = {
+  const CONFIG = {{
     TYPING_DELAY: 50,
     POLL_INTERVAL: 3000,
     MAX_POLL_CYCLES: 200,
@@ -115,22 +116,22 @@ script_parts.append(f"""// ==UserScript==
     CONTINUE_MAX_RETRIES: 15,
     WAIT_FOR_RESPONSE_MAX: 30,
     WAIT_FOR_RESPONSE_INTERVAL: 2000,
-    MIN_PART_SIZE: 100,             // minimum chars to save as a part
+    MIN_PART_SIZE: 100,
 
     // Anti-detection: Jitter & Pacing
-    TYPING_DELAY_MIN: {TYPING_DELAY_MIN},            // ms min typing delay
-    TYPING_DELAY_MAX: {TYPING_DELAY_MAX},            // ms max typing delay
-    INTER_PROMPT_PAUSE_MIN: {INTER_PROMPT_PAUSE_MIN * 1000},   // min between prompts
-    INTER_PROMPT_PAUSE_MAX: {INTER_PROMPT_PAUSE_MAX * 1000},   // max between prompts
-    LONG_BREAK_EVERY: {LONG_BREAK_EVERY},             // long break every N prompts
-    LONG_BREAK_MIN: {LONG_BREAK_MIN * 1000},          // min break
-    LONG_BREAK_MAX: {LONG_BREAK_MAX * 1000},          // max break
+    TYPING_DELAY_MIN: {TYPING_DELAY_MIN},
+    TYPING_DELAY_MAX: {TYPING_DELAY_MAX},
+    INTER_PROMPT_PAUSE_MIN: {INTER_PROMPT_PAUSE_MIN * 1000},
+    INTER_PROMPT_PAUSE_MAX: {INTER_PROMPT_PAUSE_MAX * 1000},
+    LONG_BREAK_EVERY: {LONG_BREAK_EVERY},
+    LONG_BREAK_MIN: {LONG_BREAK_MIN * 1000},
+    LONG_BREAK_MAX: {LONG_BREAK_MAX * 1000},
 
     // Error recovery
-    RATE_LIMIT_WAIT: 60000,          // 1 min wait on "too frequently"
-    SERVER_BUSY_WAIT: 30000,         // 30s wait on "server busy"
-    ERROR_MAX_RETRIES: 10,           // max retries per error type
-  };
+    RATE_LIMIT_WAIT: 60000,
+    SERVER_BUSY_WAIT: 30000,
+    ERROR_MAX_RETRIES: 10,
+  }};
 """)
 
 # ═══════════════════════════════════════════
@@ -1168,6 +1169,55 @@ script_parts.append("""
       log('\\u{1F4E6} Use "Export ZIP" for full cached responses');
     }
   }
+
+  // ─── RUN RANGE (for parallel workers) ───
+  async function runRange(startId, endId) {
+    if (STATE.running) { log('\\u{26A0} Already running'); return; }
+    if (startId < 1 || endId > PROMPTS.length || startId > endId) {
+      log('\\u{274C} Invalid range: ' + startId + '-' + endId); return;
+    }
+    if (!rootDirHandle) {
+      const granted = await requestFolderAccess();
+      if (!granted) { log('\\u{274C} No folder access.'); return; }
+    }
+    STATE.running = true;
+    STATE.executionId++;
+    STATE.nextPromptId = startId;
+    const currentExecId = STATE.executionId;
+    const rangePrompts = PROMPTS.filter(p => p.id >= startId && p.id <= endId);
+    log('\\u{1F680} RANGE: prompts ' + startId + '-' + endId + ' (' + rangePrompts.length + ' total)');
+    saveState(); updateUI();
+    try {
+      for (let i = 0; i < rangePrompts.length; i++) {
+        if (currentExecId !== STATE.executionId) break;
+        const promptObj = rangePrompts[i];
+        STATE.nextPromptId = promptObj.id;
+        saveState(); updateUI();
+        log('\\u{2550}'.repeat(40));
+        log('\\u{1F4CB} Prompt ' + promptObj.id + ' (' + (i+1) + '/' + rangePrompts.length + ')');
+        let result;
+        try { result = await executePrompt(promptObj, currentExecId); }
+        catch (e) { log('\\u{274C} Error: ' + e.message); result = 'error'; }
+        log('Result: ' + result);
+        if (currentExecId !== STATE.executionId) break;
+        STATE.nextPromptId = promptObj.id + 1;
+        saveState();
+        if (i < rangePrompts.length - 1) {
+          const pauseTime = randomBetween(CONFIG.INTER_PROMPT_PAUSE_MIN, CONFIG.INTER_PROMPT_PAUSE_MAX);
+          log('\\u{23F1} Pause: ' + Math.round(pauseTime / 1000) + 's');
+          await sleep(pauseTime);
+          await navigateToNewChat();
+          await sleep(3000);
+          await waitUntilReady(30000);
+        }
+      }
+    } finally {
+      if (currentExecId === STATE.executionId) {
+        STATE.running = false; saveState(); updateUI();
+        log('\\u{1F389} RANGE ' + startId + '-' + endId + ' DONE!');
+      }
+    }
+  }
 """)
 
 # ═══════════════════════════════════════════
@@ -1350,13 +1400,14 @@ script_parts.append("""
   // ═══════════════════════════════════════════
   window.FIGMA_AUTO = {
     start: (from = 1) => runAll(from),
+    startRange: (start, end) => runRange(start, end),
     stop: () => {
       STATE.executionId++;
       STATE.running = false;
       clearPersistedState();
       log('\\u{1F6D1} Stopped via console');
     },
-    status: () => ({
+    status: () => JSON.stringify({
       running: STATE.running,
       nextPromptId: STATE.nextPromptId,
       totalExported: STATE.totalExported,

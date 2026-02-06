@@ -1,100 +1,135 @@
-# DeepSeek Automation - Reusable Template
+# DeepSeek Automation - Parallel Template
 
 Automated prompt execution on DeepSeek chat via Chrome DevTools Protocol.  
-Inject any set of prompts, get structured text responses saved locally.
+Supports **parallel execution** with 2-4 Chrome instances for faster processing.
+
+## Features
+
+- **Parallel execution** - Run 2-4 workers simultaneously
+- **CDP injection** - Injects script via Chrome DevTools Protocol
+- **Triple-Lock export** - 3 independent completion checks before saving
+- **Anti-detection** - Typing jitter, random pauses, periodic breaks
+- **Nav-verify** - 4-strategy navigation with verification cascade
+- **Secure file server** - Per-session token auth, path validation, CORS restricted
+- **Auto-shutdown** - Closes Chrome + server when automation completes
+- **Resume support** - Restart from any prompt number
 
 ## Quick Start
 
 ### 1. Configure
+
 Edit `config.py` with your paths:
+
 ```python
 PROMPT_DIR = r"C:\path\to\your\prompts"
-OUTPUT_SCRIPT = r"C:\path\to\output.user.js"
-OUTPUT_DIR = r"C:\path\to\saved\responses"
-PROMPT_FILE_PREFIX = "PROMPT-FIGMA-"  # your naming pattern
-PROMPT_COUNT = 12                      # how many prompts
+OUTPUT_SCRIPT = r"C:\path\to\output\deepseek-automation.user.js"
+OUTPUT_DIR = r"C:\path\to\output\responses"
+PROMPT_FILE_PREFIX = "PROMPT-PROJECT-"
+PROMPT_COUNT = 10
 ```
 
-### 2. Add prompts
+Edit `parallel_config.py` for parallel settings:
+
+```python
+NUM_WORKERS = 2  # 2-4 workers
+CHROME_PROFILE_BASE = r"C:\Users\YourName\ChromeCDP"
+```
+
+### 2. Add Prompts
+
 Place `.md` files in your `PROMPT_DIR` folder:
-```
-PROMPT-FIGMA-01-FUNDAMENTALS.md
-PROMPT-FIGMA-02-TYPOGRAPHY.md
-...
-```
-See `prompts/README.md` for naming details.
 
-### 3. Build
+```
+PROMPT-PROJECT-01-INTRO.md
+PROMPT-PROJECT-02-CONTENT.md
+PROMPT-PROJECT-03-CONCLUSION.md
+```
+
+### 3. Build Script
+
 ```bash
 python build_template.py
 ```
-Generates the `.user.js` automation script.
 
-### 4. Run
+### 4. Setup Chrome Profiles (First Time)
+
 ```bash
-# First time: creates Chrome CDP profile, log into DeepSeek manually
-python start_full_automation.py
-
-# Resume from prompt N
-python start_full_automation.py 5
-
-# Check status while running
-python check_status.py
+# Preview what's needed
+python parallel_automation.py --dry-run
 ```
 
-## Features
+For each worker, open Chrome with a dedicated profile and log into DeepSeek:
 
-- **CDP injection** - injects script via Chrome DevTools Protocol (no Tampermonkey needed)
-- **Triple-Lock export** - 3 independent completion checks before saving
-- **Anti-detection** - typing jitter, random pauses, periodic breaks
-- **Nav-verify** - 4-strategy navigation with verification cascade
-- **Secure file server** - per-session token auth, path validation, CORS restricted
-- **Anti-throttle** - works with Chrome minimized
-- **Auto-shutdown** - closes Chrome + server when automation completes
-- **Resume support** - restart from any prompt number
+```powershell
+# PowerShell
+Start-Process "C:\Program Files\Google\Chrome\Application\chrome.exe" -ArgumentList "--user-data-dir=C:\Users\YourName\ChromeCDP1","--remote-debugging-port=9222","https://chat.deepseek.com"
+```
+
+### 5. Run Parallel Automation
+
+```bash
+# Default (2 workers)
+python parallel_automation.py
+
+# Use 3 workers
+python parallel_automation.py --workers 3
+
+# Preview configuration
+python parallel_automation.py --dry-run
+```
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `config.py` | **All settings** - paths, naming, timing, security |
-| `build_template.py` | Build script - assembles .user.js from config + prompts |
-| `start_full_automation.py` | Main launcher - CDP + file server + monitor + auto-shutdown |
-| `launch_automation.py` | Simple CDP injector (no file server) |
-| `launch_chrome_cdp.bat` | Manual Chrome CDP launcher |
-| `check_status.py` | Real-time status checker via CDP |
-| `preflight_check.py` | Verify all files present before launch |
+| `config.py` | Main configuration - paths, naming, timing |
+| `parallel_config.py` | Parallel worker settings |
+| `build_template.py` | Builds .user.js from config + prompts |
+| `parallel_automation.py` | **Main launcher** - orchestrates parallel workers |
+| `worker_automation.py` | Single worker instance |
+| `check_status.py` | Real-time status checker |
+| `preflight_check.py` | Verify all files before launch |
 | `prompts/` | Example prompt files |
+| `old/` | Previous versions |
+
+## Parallel Architecture
+
+```
+parallel_automation.py (orchestrator)
+    |
+    +-- Worker 1
+    |   +-- Chrome (CDP port 9222)
+    |   +-- File Server (port 8765)
+    |   +-- Prompts 1-5
+    |
+    +-- Worker 2
+    |   +-- Chrome (CDP port 9223)
+    |   +-- File Server (port 8766)
+    |   +-- Prompts 6-10
+    |
+    +-- Merge outputs -> merged/
+```
 
 ## Security
 
 | Layer | Protection |
-|-------|-----------|
+|-------|------------|
 | File server | Per-session random token (64-char hex) |
 | CORS | Restricted to DeepSeek origin only |
-| Path validation | Blocks traversal (`..`, abs paths, null bytes) |
+| Path validation | Blocks traversal attacks |
 | Request size | 5MB max per write |
-| CDP | Dedicated Chrome profile (isolated from main browser) |
-| Runtime | 4-hour safety timeout, crash detection |
-
-## Architecture
-
-```
-start_full_automation.py
-    |
-    +-- Chrome CDP (port 9222)
-    |       |-- DeepSeek tab
-    |       |-- Injected automation script (.user.js)
-    |       |-- Mock File System API
-    |       +-- Anti-throttle (visibility mock)
-    |
-    +-- File Server (port 8765, localhost only)
-            +-- Token-authenticated writes -> OUTPUT_DIR
-```
+| CDP | Dedicated Chrome profile (isolated) |
+| Runtime | 4-hour safety timeout |
 
 ## Requirements
 
 - Python 3.8+
 - `pip install websockets`
 - Google Chrome
-- DeepSeek account (free tier works)
+- DeepSeek account
+
+## Documentation
+
+- [PARALLEL-README.md](PARALLEL-README.md) - Detailed parallel setup guide
+- [PROMPT-QUICK-START.md](PROMPT-QUICK-START.md) - Quick prompt creation guide
+- [prompts/README.md](prompts/README.md) - Prompt naming conventions

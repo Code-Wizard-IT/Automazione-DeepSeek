@@ -9,33 +9,33 @@ import os
 
 # ─── Paths ────────────────────────────────────────────────
 # Where your prompt .md files are stored
-PROMPT_DIR = r"C:\Users\cresc\Desktop\Prompt"
+PROMPT_DIR = r"C:\path\to\your\prompts"
 
 # Output .user.js script path
-OUTPUT_SCRIPT = r"C:\Users\cresc\Desktop\deepseek-automation.user.js"
+OUTPUT_SCRIPT = r"C:\path\to\output\deepseek-automation.user.js"
 
 # Where DeepSeek responses are saved
-OUTPUT_DIR = r"C:\Users\cresc\Desktop\output deepseek\new"
+OUTPUT_DIR = r"C:\path\to\output\responses"
 
 # Chrome CDP dedicated profile (login to DeepSeek once, persists)
-CHROME_USER_DATA = r"C:\Users\cresc\ChromeCDP"
+CHROME_USER_DATA = r"C:\Users\YourName\ChromeCDP"
 
 # ─── Prompt naming ────────────────────────────────────────
 # Files must match: {PREFIX}{NN}-{TOPIC}.md
-# Example: PROMPT-FIGMA-01-FUNDAMENTALS.md
-PROMPT_FILE_PREFIX = "PROMPT-FIGMA-"
+# Example: PROMPT-PROJECT-01-INTRO.md
+PROMPT_FILE_PREFIX = "PROMPT-PROJECT-"
 PROMPT_FILE_SUFFIX = ".md"
 
-# Display name prefix in generated script (e.g. "FIGMA-01-FUNDAMENTALS")
-DISPLAY_PREFIX = "FIGMA-"
+# Display name prefix in generated script
+DISPLAY_PREFIX = "PROJECT-"
 
 # How many prompts (1 to N)
-PROMPT_COUNT = 12
+PROMPT_COUNT = 3
 
 # ─── Script metadata ─────────────────────────────────────
 SCRIPT_NAME = "DeepSeek Automation"
-SCRIPT_VERSION = "2.1"
-SCRIPT_DESCRIPTION = "Automated prompt execution on DeepSeek"
+SCRIPT_VERSION = "3.0"
+SCRIPT_DESCRIPTION = "Automated prompt execution on DeepSeek (parallel support)"
 
 # ─── CDP & Server ────────────────────────────────────────
 CDP_PORT = 9222
